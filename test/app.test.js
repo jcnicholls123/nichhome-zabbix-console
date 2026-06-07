@@ -48,6 +48,29 @@ test("diagnostics checks Zabbix version and login", async () => {
   assert.ok(calls.some((call) => call.method === "user.login"));
 });
 
+test("Zabbix upstream errors are returned with method context", async () => {
+  const app = createApp({ env: baseEnv, fetchImpl: async (_url, options) => {
+    const body = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        jsonrpc: "2.0",
+        id: body.id,
+        result: body.method === "user.login" ? "mock-session" : undefined,
+        error: body.method === "problem.get"
+          ? { code: -32602, message: "Invalid params.", data: "No permissions to referred object or it does not exist." }
+          : undefined
+      })
+    };
+  } });
+
+  const response = await request(app).get("/api/problems").expect(502);
+
+  assert.match(response.body.error, /Zabbix problem\.get failed/);
+  assert.match(response.body.error, /No permissions/);
+});
+
 test("login falls back to user parameter for older Zabbix APIs", async () => {
   const calls = [];
   const app = createApp({ env: baseEnv, fetchImpl: async (_url, options) => {

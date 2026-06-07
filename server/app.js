@@ -34,11 +34,17 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
   }));
 
   app.get("/api/overview", asyncHandler(async (req, res) => {
-    const [problems, events, hosts] = await Promise.all([
+    const [problemsResult, eventsResult, hostsResult] = await Promise.allSettled([
       zabbix.currentProblems(req.query),
       zabbix.recentEvents({ limit: 12 }),
       zabbix.hosts()
     ]);
+    if (problemsResult.status === "rejected" && eventsResult.status === "rejected" && hostsResult.status === "rejected") {
+      throw problemsResult.reason;
+    }
+    const problems = valueOrEmpty(problemsResult);
+    const events = valueOrEmpty(eventsResult);
+    const hosts = valueOrEmpty(hostsResult);
     const bySeverity = [0, 1, 2, 3, 4, 5].map((severity) => ({
       severity,
       count: problems.filter((problem) => problem.severity === severity).length
@@ -52,7 +58,8 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
         enabled: hosts.filter((host) => host.status === "enabled").length,
         critical: hosts.filter((host) => host.activeProblems > 0).slice(0, 8)
       },
-      grafana: grafana.settings()
+      grafana: grafana.settings(),
+      warnings: [warningFor("Problems", problemsResult), warningFor("Events", eventsResult), warningFor("Hosts", hostsResult)].filter(Boolean)
     });
   }));
 
@@ -111,7 +118,7 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
 
   app.use((err, _req, res, _next) => {
     const status = err.status || 500;
-    res.status(status).json({ error: status >= 500 ? "Upstream service error" : err.message });
+    res.status(status).json({ error: safeErrorMessage(err, status) });
   });
 
   return app;
@@ -119,4 +126,18 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
 
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+function valueOrEmpty(result) {
+  return result.status === "fulfilled" ? result.value : [];
+}
+
+function warningFor(label, result) {
+  return result.status === "rejected" ? `${label}: ${safeErrorMessage(result.reason, result.reason?.status || 500)}` : null;
+}
+
+function safeErrorMessage(err, status) {
+  const message = String(err?.message || "Request failed").replace(/password[=:]\S+/gi, "password=hidden").slice(0, 500);
+  if (status === 500 && !/^Zabbix /i.test(message)) return "Internal server error";
+  return message;
 }

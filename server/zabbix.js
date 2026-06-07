@@ -27,7 +27,12 @@ export class ZabbixClient {
 
     if (auth) body.auth = await this.login();
 
-    return this.post(body);
+    try {
+      return await this.post(body);
+    } catch (error) {
+      error.message = `Zabbix ${method} failed: ${error.message}`;
+      throw error;
+    }
   }
 
   async login() {
@@ -69,9 +74,18 @@ export class ZabbixClient {
     };
     if (!this.config.zabbixConfigured) return result;
 
-    result.version = await this.call("apiinfo.version", {}, { auth: false });
-    await this.login();
-    result.login = true;
+    try {
+      result.version = await this.call("apiinfo.version", {}, { auth: false });
+    } catch (error) {
+      result.versionError = error.message;
+      return result;
+    }
+    try {
+      await this.login();
+      result.login = true;
+    } catch (error) {
+      result.loginError = error.message;
+    }
     return result;
   }
 
@@ -92,7 +106,8 @@ export class ZabbixClient {
       }
       const payload = await response.json();
       if (payload.error) {
-        const error = new Error(payload.error.data || payload.error.message || "Zabbix API error");
+        const message = [payload.error.message, payload.error.data].filter(Boolean).join(": ") || "Zabbix API error";
+        const error = new Error(message);
         error.status = 502;
         throw error;
       }

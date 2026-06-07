@@ -56,6 +56,7 @@ async function renderOverview() {
       ${stat("Critical hosts", data.hosts.critical.length)}
       ${stat("Grafana", data.grafana.enabled ? "On" : "Off")}
     </section>
+    ${data.warnings?.length ? `<section class="panel" style="margin:12px 0"><div class="list">${data.warnings.map((warning) => `<div class="empty">${escapeHtml(warning)}</div>`).join("")}</div></section>` : ""}
     <section class="grid split" style="margin-top:12px">
       <div class="panel">
         <div class="panel-head"><h2>Active Problems</h2><a class="button" href="#problems">Open</a></div>
@@ -238,6 +239,8 @@ async function runDiagnostics() {
       ${kv("API URL", result.apiUrl || "Not set")}
       ${kv("Zabbix version", result.version || "Unavailable")}
       ${kv("Login", result.login ? "OK" : "Not tested")}
+      ${result.versionError ? kv("Version error", result.versionError) : ""}
+      ${result.loginError ? kv("Login error", result.loginError) : ""}
     `;
   } catch (error) {
     target.innerHTML = errorPanel(error.message);
