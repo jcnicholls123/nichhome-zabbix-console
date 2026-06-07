@@ -1,0 +1,24 @@
+services:
+  nichhome-zabbix-console:
+    build: .
+    container_name: nichhome-zabbix-console
+    ports:
+      - "${APP_PORT:-3000}:${APP_PORT:-3000}"
+    environment:
+      APP_PORT: ${APP_PORT:-3000}
+      ZABBIX_API_URL: ${ZABBIX_API_URL:?Set ZABBIX_API_URL}
+      ZABBIX_USERNAME: ${ZABBIX_USERNAME:?Set ZABBIX_USERNAME}
+      ZABBIX_PASSWORD: ${ZABBIX_PASSWORD:?Set ZABBIX_PASSWORD}
+      GRAFANA_ENABLED: ${GRAFANA_ENABLED:-false}
+      GRAFANA_URL: ${GRAFANA_URL:-}
+      GRAFANA_API_KEY: ${GRAFANA_API_KEY:-}
+      READ_ONLY: ${READ_ONLY:-false}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-900}
+      REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-12000}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + (process.env.APP_PORT || 3000) + '/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

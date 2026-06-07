@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NichHome Zabbix Console</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#overview" aria-label="NichHome Zabbix Console">
+          <span class="brand-mark">NH</span>
+          <span>
+            <strong>NichHome</strong>
+            <small>Zabbix Console</small>
+          </span>
+        </a>
+        <div class="global-search">
+          <input id="globalSearch" type="search" placeholder="Search hosts, problems, tags">
+        </div>
+        <button id="refreshButton" class="icon-button" title="Refresh" type="button">↻</button>
+      </header>
+
+      <nav class="tabs" aria-label="Primary">
+        <a href="#overview" data-route="overview">Overview</a>
+        <a href="#problems" data-route="problems">Problems</a>
+        <a href="#hosts" data-route="hosts">Hosts</a>
+        <a href="#dashboards" data-route="dashboards">Dashboards</a>
+        <a href="#settings" data-route="settings">Settings</a>
+      </nav>
+
+      <main id="view" class="view" tabindex="-1"></main>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
