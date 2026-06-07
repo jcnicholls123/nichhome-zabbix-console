@@ -44,6 +44,45 @@ docker compose up --build
 
 Open `http://localhost:3000`, or the port you set with `APP_PORT`.
 
+## TrueNAS SCALE Install
+
+Use the published container image instead of cloning the repo inside TrueNAS.
+
+In TrueNAS SCALE, go to **Apps**, then **Discover Apps**, then use **Custom App** or **Install via YAML**. Paste this compose file and replace the Zabbix values:
+
+```yaml
+services:
+  nichhome-zabbix-console:
+    image: ghcr.io/jcnicholls123/nichhome-zabbix-console:latest
+    container_name: nichhome-zabbix-console
+    ports:
+      - "3000:3000"
+    environment:
+      APP_PORT: 3000
+      ZABBIX_API_URL: "http://YOUR-ZABBIX-SERVER/api_jsonrpc.php"
+      ZABBIX_USERNAME: "YOUR-ZABBIX-API-USER"
+      ZABBIX_PASSWORD: "YOUR-ZABBIX-PASSWORD"
+      GRAFANA_ENABLED: "false"
+      GRAFANA_URL: ""
+      GRAFANA_API_KEY: ""
+      READ_ONLY: "false"
+      SESSION_TTL_SECONDS: 900
+      REQUEST_TIMEOUT_MS: 12000
+    restart: unless-stopped
+```
+
+Then open:
+
+```text
+http://YOUR-TRUENAS-IP:3000
+```
+
+If TrueNAS cannot pull the image, check that the package is public at:
+
+```text
+https://github.com/jcnicholls123/nichhome-zabbix-console/pkgs/container/nichhome-zabbix-console
+```
+
 ## Local Development
 
 ```bash
