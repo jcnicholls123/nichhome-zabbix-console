@@ -27,6 +27,55 @@ export class ZabbixClient {
 
     if (auth) body.auth = await this.login();
 
+    return this.post(body);
+  }
+
+  async login() {
+    const now = Date.now();
+    if (this.auth && now < this.authExpiresAt) return this.auth;
+
+    let result;
+    try {
+      result = await this.call(
+        "user.login",
+        {
+          username: this.config.zabbixUsername,
+          password: this.config.zabbixPassword
+        },
+        { auth: false }
+      );
+    } catch (error) {
+      if (!/invalid parameter|unexpected parameter|username/i.test(error.message)) throw error;
+      result = await this.call(
+        "user.login",
+        {
+          user: this.config.zabbixUsername,
+          password: this.config.zabbixPassword
+        },
+        { auth: false }
+      );
+    }
+    this.auth = result;
+    this.authExpiresAt = now + this.config.sessionTtlSeconds * 1000;
+    return this.auth;
+  }
+
+  async diagnostics() {
+    const result = {
+      configured: this.config.zabbixConfigured,
+      apiUrl: redactUrl(this.config.zabbixApiUrl),
+      version: null,
+      login: false
+    };
+    if (!this.config.zabbixConfigured) return result;
+
+    result.version = await this.call("apiinfo.version", {}, { auth: false });
+    await this.login();
+    result.login = true;
+    return result;
+  }
+
+  async post(body) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
     try {
@@ -36,7 +85,11 @@ export class ZabbixClient {
         body: JSON.stringify(body),
         signal: controller.signal
       });
-      if (!response.ok) throw new Error(`Zabbix HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(`Zabbix HTTP ${response.status}`);
+        error.status = 502;
+        throw error;
+      }
       const payload = await response.json();
       if (payload.error) {
         const error = new Error(payload.error.data || payload.error.message || "Zabbix API error");
@@ -44,26 +97,16 @@ export class ZabbixClient {
         throw error;
       }
       return sanitize(payload.result);
+    } catch (error) {
+      if (error.name === "AbortError") {
+        const timeoutError = new Error(`Zabbix API timed out after ${this.config.requestTimeoutMs}ms`);
+        timeoutError.status = 504;
+        throw timeoutError;
+      }
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
-  }
-
-  async login() {
-    const now = Date.now();
-    if (this.auth && now < this.authExpiresAt) return this.auth;
-
-    const result = await this.call(
-      "user.login",
-      {
-        username: this.config.zabbixUsername,
-        password: this.config.zabbixPassword
-      },
-      { auth: false }
-    );
-    this.auth = result;
-    this.authExpiresAt = now + this.config.sessionTtlSeconds * 1000;
-    return this.auth;
   }
 
   async currentProblems(filters = {}) {
@@ -296,4 +339,16 @@ function rangeToSeconds(range) {
   if (!match) return 21600;
   const amount = Number(match[1]);
   return amount * { h: 3600, d: 86400, w: 604800 }[match[2]];
+}
+
+function redactUrl(value) {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }

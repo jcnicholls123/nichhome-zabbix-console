@@ -29,6 +29,10 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
     });
   });
 
+  app.get("/api/diagnostics/zabbix", asyncHandler(async (_req, res) => {
+    res.json(await zabbix.diagnostics());
+  }));
+
   app.get("/api/overview", asyncHandler(async (req, res) => {
     const [problems, events, hosts] = await Promise.all([
       zabbix.currentProblems(req.query),

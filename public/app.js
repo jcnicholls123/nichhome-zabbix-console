@@ -40,7 +40,7 @@ async function render() {
     if (name === "settings") return renderSettings();
     location.hash = "#overview";
   } catch (error) {
-    view.innerHTML = empty(error.message || "Unable to load view.");
+    view.innerHTML = errorPanel(error.message || "Unable to load view.");
   }
 }
 
@@ -201,6 +201,8 @@ function renderSettings() {
           ${kv("Configured", state.config.zabbixConfigured ? "Yes" : "No")}
           ${kv("Read-only mode", state.config.readOnly ? "On" : "Off")}
           <div class="card meta">Set ZABBIX_API_URL, ZABBIX_USERNAME, and ZABBIX_PASSWORD in Docker environment variables.</div>
+          <button class="button" id="diagnosticsButton" type="button">Test Zabbix Connection</button>
+          <div id="diagnosticsResult"></div>
         </div>
       </div>
       <form class="panel" id="settingsForm">
@@ -223,6 +225,23 @@ function renderSettings() {
     saveSettings();
     notify("Settings saved.");
   });
+  document.querySelector("#diagnosticsButton").addEventListener("click", runDiagnostics);
+}
+
+async function runDiagnostics() {
+  const target = document.querySelector("#diagnosticsResult");
+  target.innerHTML = `<div class="empty">Testing...</div>`;
+  try {
+    const result = await api("/api/diagnostics/zabbix", {}, 20000);
+    target.innerHTML = `
+      ${kv("Configured", result.configured ? "Yes" : "No")}
+      ${kv("API URL", result.apiUrl || "Not set")}
+      ${kv("Zabbix version", result.version || "Unavailable")}
+      ${kv("Login", result.login ? "OK" : "Not tested")}
+    `;
+  } catch (error) {
+    target.innerHTML = errorPanel(error.message);
+  }
 }
 
 function problemFilters(filters) {
@@ -398,11 +417,30 @@ function empty(message) {
   return `<div class="empty">${escapeHtml(message)}</div>`;
 }
 
-async function api(path, options = {}) {
-  const response = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "Request failed");
-  return payload;
+function errorPanel(message) {
+  return `
+    <div class="empty">
+      <strong>Could not load data.</strong><br>
+      ${escapeHtml(message)}<br><br>
+      Open Settings and use Test Zabbix Connection, or check the container logs.
+    </div>
+  `;
+}
+
+async function api(path, options = {}, timeoutMs = 18000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(path, { headers: { "content-type": "application/json" }, signal: controller.signal, ...options });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
+    return payload;
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error("Request timed out while waiting for the backend.");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function query(params) {

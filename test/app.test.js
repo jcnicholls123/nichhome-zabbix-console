@@ -34,6 +34,45 @@ test("recent events are read through event.get", async () => {
   assert.ok(calls.some((call) => call.method === "event.get"));
 });
 
+test("diagnostics checks Zabbix version and login", async () => {
+  const calls = [];
+  const app = createApp({ env: baseEnv, fetchImpl: mockZabbix(calls) });
+
+  const response = await request(app).get("/api/diagnostics/zabbix").expect(200);
+
+  assert.equal(response.body.configured, true);
+  assert.equal(response.body.version, "7.0.0");
+  assert.equal(response.body.login, true);
+  assert.equal(response.body.apiUrl, "https://zabbix.example/api_jsonrpc.php");
+  assert.ok(calls.some((call) => call.method === "apiinfo.version"));
+  assert.ok(calls.some((call) => call.method === "user.login"));
+});
+
+test("login falls back to user parameter for older Zabbix APIs", async () => {
+  const calls = [];
+  const app = createApp({ env: baseEnv, fetchImpl: async (_url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body);
+    if (body.method === "user.login" && body.params.username) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          jsonrpc: "2.0",
+          id: body.id,
+          error: { code: -32602, message: "Invalid params.", data: "Invalid parameter \"username\"." }
+        })
+      };
+    }
+    return mockZabbix(calls)(_url, options);
+  } });
+
+  await request(app).get("/api/problems").expect(200);
+
+  assert.ok(calls.some((call) => call.method === "user.login" && call.params.username));
+  assert.ok(calls.some((call) => call.method === "user.login" && call.params.user));
+});
+
 test("acknowledge calls event.acknowledge unless read-only mode is enabled", async () => {
   const calls = [];
   const app = createApp({ env: baseEnv, fetchImpl: mockZabbix(calls) });
@@ -103,6 +142,7 @@ function mockZabbix(calls) {
 
 function resultFor(method) {
   if (method === "user.login") return "mock-session";
+  if (method === "apiinfo.version") return "7.0.0";
   if (method === "problem.get" || method === "event.get") {
     return [
       {
