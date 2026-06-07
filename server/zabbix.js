@@ -28,7 +28,7 @@ export class ZabbixClient {
     if (auth && !this.config.zabbixTokenAuth) body.auth = await this.login();
 
     try {
-      return await this.post(body);
+      return await this.post(body, { auth });
     } catch (error) {
       error.message = `Zabbix ${method} failed: ${error.message}`;
       throw error;
@@ -95,13 +95,13 @@ export class ZabbixClient {
     return result;
   }
 
-  async post(body) {
+  async post(body, { auth = true } = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
     try {
       const response = await this.fetch(this.config.zabbixApiUrl, {
         method: "POST",
-        headers: this.headers(),
+        headers: this.headers({ auth }),
         body: JSON.stringify(body),
         signal: controller.signal
       });
@@ -130,9 +130,9 @@ export class ZabbixClient {
     }
   }
 
-  headers() {
+  headers({ auth = true } = {}) {
     const headers = { "content-type": "application/json" };
-    if (this.config.zabbixTokenAuth) headers.authorization = `Bearer ${this.config.zabbixApiToken}`;
+    if (auth && this.config.zabbixTokenAuth) headers.authorization = `Bearer ${this.config.zabbixApiToken}`;
     return headers;
   }
 

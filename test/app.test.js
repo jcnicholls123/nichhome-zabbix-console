@@ -69,7 +69,8 @@ test("API token auth skips user.login and keeps token server-side", async () => 
   await request(app).get("/api/problems").expect(200);
 
   assert.equal(calls.some((call) => call.method === "user.login"), false);
-  assert.ok(calls.every((call) => call.authorization === "Bearer api-token-secret"));
+  assert.equal(calls.find((call) => call.method === "apiinfo.version").authorization, undefined);
+  assert.ok(calls.filter((call) => call.method !== "apiinfo.version").every((call) => call.authorization === "Bearer api-token-secret"));
 });
 
 test("Zabbix upstream errors are returned with method context", async () => {
