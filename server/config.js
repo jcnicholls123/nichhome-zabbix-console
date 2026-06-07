@@ -8,6 +8,7 @@ const boolFromEnv = (value, fallback = false) => {
 const schema = z.object({
   appPort: z.coerce.number().int().min(1).max(65535).default(3000),
   zabbixApiUrl: z.string().url().optional(),
+  zabbixApiToken: z.string().optional(),
   zabbixUsername: z.string().optional(),
   zabbixPassword: z.string().optional(),
   grafanaEnabled: z.boolean().default(false),
@@ -22,6 +23,7 @@ export function loadConfig(env = process.env) {
   const parsed = schema.parse({
     appPort: env.APP_PORT,
     zabbixApiUrl: env.ZABBIX_API_URL,
+    zabbixApiToken: env.ZABBIX_API_TOKEN || undefined,
     zabbixUsername: env.ZABBIX_USERNAME,
     zabbixPassword: env.ZABBIX_PASSWORD,
     grafanaEnabled: boolFromEnv(env.GRAFANA_ENABLED),
@@ -34,7 +36,8 @@ export function loadConfig(env = process.env) {
 
   return {
     ...parsed,
-    zabbixConfigured: Boolean(parsed.zabbixApiUrl && parsed.zabbixUsername && parsed.zabbixPassword),
+    zabbixTokenAuth: Boolean(parsed.zabbixApiUrl && parsed.zabbixApiToken),
+    zabbixConfigured: Boolean(parsed.zabbixApiUrl && (parsed.zabbixApiToken || (parsed.zabbixUsername && parsed.zabbixPassword))),
     grafanaConfigured: Boolean(parsed.grafanaEnabled && parsed.grafanaUrl)
   };
 }

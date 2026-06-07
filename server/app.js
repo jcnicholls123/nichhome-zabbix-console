@@ -24,6 +24,7 @@ export function createApp({ env = process.env, fetchImpl = globalThis.fetch } = 
   app.get("/api/config", (_req, res) => {
     res.json({
       zabbixConfigured: config.zabbixConfigured,
+      zabbixTokenAuth: config.zabbixTokenAuth,
       grafana: grafana.settings(),
       readOnly: config.readOnly
     });

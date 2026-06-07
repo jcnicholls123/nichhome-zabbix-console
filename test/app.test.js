@@ -48,6 +48,30 @@ test("diagnostics checks Zabbix version and login", async () => {
   assert.ok(calls.some((call) => call.method === "user.login"));
 });
 
+test("API token auth skips user.login and keeps token server-side", async () => {
+  const calls = [];
+  const env = {
+    ...baseEnv,
+    ZABBIX_API_TOKEN: "api-token-secret",
+    ZABBIX_USERNAME: "",
+    ZABBIX_PASSWORD: ""
+  };
+  const app = createApp({ env, fetchImpl: mockZabbix(calls) });
+
+  const config = await request(app).get("/api/config").expect(200);
+  assert.equal(config.body.zabbixTokenAuth, true);
+  assert.equal(JSON.stringify(config.body).includes("api-token-secret"), false);
+
+  const diagnostics = await request(app).get("/api/diagnostics/zabbix").expect(200);
+  assert.equal(diagnostics.body.tokenAuth, true);
+  assert.equal(diagnostics.body.login, true);
+
+  await request(app).get("/api/problems").expect(200);
+
+  assert.equal(calls.some((call) => call.method === "user.login"), false);
+  assert.ok(calls.every((call) => call.authorization === "Bearer api-token-secret"));
+});
+
 test("Zabbix upstream errors are returned with method context", async () => {
   const app = createApp({ env: baseEnv, fetchImpl: async (_url, options) => {
     const body = JSON.parse(options.body);
@@ -154,7 +178,7 @@ test("mobile layout keeps primary navigation horizontally scrollable", async () 
 function mockZabbix(calls) {
   return async (_url, options) => {
     const body = JSON.parse(options.body);
-    calls.push(body);
+    calls.push({ ...body, authorization: options.headers.authorization });
     return {
       ok: true,
       status: 200,

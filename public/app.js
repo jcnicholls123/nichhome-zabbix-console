@@ -200,8 +200,9 @@ function renderSettings() {
         <div class="panel-head"><h2>Zabbix API</h2></div>
         <div class="list">
           ${kv("Configured", state.config.zabbixConfigured ? "Yes" : "No")}
+          ${kv("Auth mode", state.config.zabbixTokenAuth ? "API token" : "Username/password")}
           ${kv("Read-only mode", state.config.readOnly ? "On" : "Off")}
-          <div class="card meta">Set ZABBIX_API_URL, ZABBIX_USERNAME, and ZABBIX_PASSWORD in Docker environment variables.</div>
+          <div class="card meta">Set ZABBIX_API_URL and either ZABBIX_API_TOKEN or ZABBIX_USERNAME/ZABBIX_PASSWORD in Docker environment variables.</div>
           <button class="button" id="diagnosticsButton" type="button">Test Zabbix Connection</button>
           <div id="diagnosticsResult"></div>
         </div>
@@ -236,6 +237,7 @@ async function runDiagnostics() {
     const result = await api("/api/diagnostics/zabbix", {}, 20000);
     target.innerHTML = `
       ${kv("Configured", result.configured ? "Yes" : "No")}
+      ${kv("Auth mode", result.tokenAuth ? "API token" : "Username/password")}
       ${kv("API URL", result.apiUrl || "Not set")}
       ${kv("Zabbix version", result.version || "Unavailable")}
       ${kv("Login", result.login ? "OK" : "Not tested")}

@@ -24,6 +24,7 @@ Create an `.env` file or set variables in your container platform:
 ```env
 APP_PORT=3000
 ZABBIX_API_URL=https://zabbix.example.com/api_jsonrpc.php
+ZABBIX_API_TOKEN=
 ZABBIX_USERNAME=api-user
 ZABBIX_PASSWORD=change-me
 GRAFANA_ENABLED=false
@@ -34,7 +35,7 @@ SESSION_TTL_SECONDS=900
 REQUEST_TIMEOUT_MS=12000
 ```
 
-Secrets are only read by the backend. They are never returned to frontend JavaScript.
+Secrets are only read by the backend. They are never returned to frontend JavaScript. If `ZABBIX_API_TOKEN` is set, token authentication is used and username/password login is skipped.
 
 ## Run With Docker Compose
 
@@ -60,8 +61,9 @@ services:
     environment:
       APP_PORT: 3000
       ZABBIX_API_URL: "http://YOUR-ZABBIX-SERVER/api_jsonrpc.php"
-      ZABBIX_USERNAME: "YOUR-ZABBIX-API-USER"
-      ZABBIX_PASSWORD: "YOUR-ZABBIX-PASSWORD"
+      ZABBIX_API_TOKEN: "YOUR-ZABBIX-API-TOKEN"
+      ZABBIX_USERNAME: ""
+      ZABBIX_PASSWORD: ""
       GRAFANA_ENABLED: "false"
       GRAFANA_URL: ""
       GRAFANA_API_KEY: ""

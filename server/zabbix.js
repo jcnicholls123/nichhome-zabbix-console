@@ -25,7 +25,7 @@ export class ZabbixClient {
       id: this.id++
     };
 
-    if (auth) body.auth = await this.login();
+    if (auth && !this.config.zabbixTokenAuth) body.auth = await this.login();
 
     try {
       return await this.post(body);
@@ -36,6 +36,7 @@ export class ZabbixClient {
   }
 
   async login() {
+    if (this.config.zabbixTokenAuth) return null;
     const now = Date.now();
     if (this.auth && now < this.authExpiresAt) return this.auth;
 
@@ -68,6 +69,7 @@ export class ZabbixClient {
   async diagnostics() {
     const result = {
       configured: this.config.zabbixConfigured,
+      tokenAuth: this.config.zabbixTokenAuth,
       apiUrl: redactUrl(this.config.zabbixApiUrl),
       version: null,
       login: false
@@ -80,11 +82,15 @@ export class ZabbixClient {
       result.versionError = error.message;
       return result;
     }
-    try {
-      await this.login();
+    if (this.config.zabbixTokenAuth) {
       result.login = true;
-    } catch (error) {
-      result.loginError = error.message;
+    } else {
+      try {
+        await this.login();
+        result.login = true;
+      } catch (error) {
+        result.loginError = error.message;
+      }
     }
     return result;
   }
@@ -95,7 +101,7 @@ export class ZabbixClient {
     try {
       const response = await this.fetch(this.config.zabbixApiUrl, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: this.headers(),
         body: JSON.stringify(body),
         signal: controller.signal
       });
@@ -122,6 +128,12 @@ export class ZabbixClient {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  headers() {
+    const headers = { "content-type": "application/json" };
+    if (this.config.zabbixTokenAuth) headers.authorization = `Bearer ${this.config.zabbixApiToken}`;
+    return headers;
   }
 
   async currentProblems(filters = {}) {
